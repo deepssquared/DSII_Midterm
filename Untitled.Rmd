@@ -1,0 +1,277 @@
+---
+title: "Midterm Report"
+author: "Chirag Shah, Nathalie Fadel, Deepika Dilip"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+knitr::opts_chunk$set(warning=F)
+knitr::opts_chunk$set(message=F)
+```
+
+##Introduction
+
+While median wages are remaining stagnant, housing prices in Taipei, Taiwan are increasing exponentially. Using a historical data set of real estate valuation from the Sindian District and New Taipei City in Taiwan, we decided to explore which predictors had the most impact on housing prices in Taipei. 
+
+We outlined our analysis plan so that our models excluded observations that had missing values. However, we did not have any observations with missing information and therefore a sensitivity analysis was not necessary. The variable “no” in the original dataset was dropped, as it was an observation id, which would not be relevant in our analysis. 
+
+This dataset contains 414 observations, with the 6 predictors as follows:
+
+* X1=the transaction date (for example, 2013.250=2013 March, 2013.500=2013 June, etc.)
+* X2=the house age (unit: year) 
+* X3=the distance to the nearest MRT station (unit: meter) 
+* X4=the number of convenience stores in the living circle on foot (integer) 
+* X5=the geographic coordinate, latitude. (unit: degree) 
+* X6=the geographic coordinate, longitude. (unit: degree) 
+
+The outcome is as follows: 
+
+* Y= house price of unit area (10000 New Taiwan Dollar/Ping, where Ping is a local unit, 1 Ping = 3.3 meter squared) 
+
+## Exploratory Data Analysis
+
+```{r packages, echo=FALSE, include=FALSE}
+library(caret)
+library(readxl)
+library(tidyverse)
+library(glmnet)
+library(ISLR)
+library(corrplot)
+library(pastecs)
+library(earth)
+library(splines)
+library(mgcv)
+library(knitr)
+library(vip)
+```
+
+```{r data cleaning, message=F, include=FALSE}
+taipei_data <- read_excel("Real_estate_valuation_data_set.xlsx") %>%
+  janitor::clean_names()
+
+taipei_data <- na.omit(taipei_data) 
+taipei_data$no <- NULL
+
+taipei_data  =
+  taipei_data %>%
+  rename(house_price = y_house_price_of_unit_area)
+taipei_data  = 
+ taipei_data %>%
+  rename(transaction_date = x1_transaction_date,
+         house_age = x2_house_age,
+         distance_mrt = x3_distance_to_the_nearest_mrt_station,
+         conv_stores = x4_number_of_convenience_stores,
+         latitude = x5_latitude,
+         longitude = x6_longitude
+         )
+```
+
+####Descriptive Statistics
+```{r, echo=FALSE}
+stat.desc(taipei_data) %>% round() %>%  kable(full_width = F, font_size=8)
+```
+
+
+
+
+### Designating the Predictors and Outcome
+```{r, include=FALSE}
+taipei_data <- na.omit(taipei_data) 
+taipei_data$no <- NULL
+
+x <- model.matrix(house_price~. ,taipei_data)[,-1]
+y <- taipei_data$house_price
+```
+
+
+###Observing Correlation of Predictors
+```{r, echo=FALSE}
+corrplot(cor(x))
+```
+
+
+###Scatterplot
+```{r, echo=FALSE}
+theme1 <- trellis.par.get()
+theme1$plot.symbol$col <- rgb(.2, .4, .2, .5)
+theme1$plot.symbol$pch <- 16
+theme1$plot.line$col <- rgb(.8, .1, .1, 1)
+theme1$plot.line$lwd <- 2
+theme1$strip.background$col <- rgb(.0, .2, .6, .2)
+trellis.par.set(theme1)
+featurePlot(x, y, plot = "scatter", labels = c("","Y"),
+            type = c("p"), layout = c(4, 2))
+```
+
+We can see that there may be a non-linear relationship between house price and distance to MRT station, and between house price and house age. We will test both of these terms independently and together as spline terms in GAM models. Transaction date and distance to convenience stores appear to be categorical predictors.
+
+## Models
+We used a total of six different modeling techniques to estimate house prices. GAMS, MARS, and KNN were nonparametric while ridge regression, lasso regression, and linear regression were parametric. We started with the most flexible model and progressed to the most stringent. All six predictors mentioned in the Introduction were used in our analysis. The results are summarized in the following table:
+
+### Summary of Models Used
+Model | R^2 | RMSE | Model Limitations
+------------- | ------------- | ------------- | -------------
+GAM  | 0.687 | Content Cell | Content Cell
+MARS | 0.7005081 | 7.568432 | Content Cell
+KNN | xxxxxx | 8.208905 | Content Cell
+Ridge Regression | xxxxxx | 8.799873 | Content Cell
+Lasso | Content Cell | 8.810508 | Content Cell
+Linear Regression | 0.5824 | 8.782313 | LINE assumption needs to hold
+
+```{r, echo=FALSE, message=F}
+#Partitioning the dataset
+data(taipei_data)
+
+## 75% of the sample size
+smp_size <- floor(0.80 * nrow(taipei_data))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_taipei <- sample(seq_len(nrow(taipei_data)), size = smp_size)
+train <- taipei_data[train_taipei, ]
+test <- taipei_data[-train_taipei, ]
+```
+
+#### GAM
+```{r GAM calc, echo=FALSE, include=FALSE, message=F}
+gam.m1 <- gam(house_price ~ transaction_date + house_age + distance_mrt + conv_stores + latitude + longitude, data = taipei_data)
+
+gam.m2 <- gam(house_price ~ transaction_date + house_age + s(distance_mrt) + conv_stores + latitude + longitude, data = taipei_data)
+
+#Spline term applied to distance to mrt station
+
+gam.m3 <- gam(house_price ~ transaction_date + s(house_age) + distance_mrt + conv_stores + latitude + longitude, data = taipei_data)
+
+#spline term applied to house age
+
+gam.m4 <- gam(house_price ~ transaction_date + s(house_age) + s(distance_mrt) + conv_stores + latitude + longitude, data = taipei_data)
+
+#Both house age and distance to mrt station are splined
+```
+
+```{r, echo=FALSE}
+anova(gam.m1, gam.m2, gam.m3, gam.m4, test = "F")
+#summary(gam.m2)
+#summary(gam.m3)
+#summary(gam.m4)
+
+
+plot(gam.m2)
+plot(gam.m3)
+```
+
+GAM M4 has best R^2 value. The model uses house age and distance to the nearest MRT station as spline predictors, while also including transaction date, latitude, longitude, and the number of convenience stores in the living circle on foot.
+
+
+##### MARS
+###### Assumptions:
+```{r, echo=FALSE}
+set.seed(2)
+mars_grid <- expand.grid(degree = 1:2, nprune = 2:6)
+ctrl1 <- trainControl(method = "cv", number = 10)
+
+mars.fit <- train(x, y, method = "earth", tuneGrid = mars_grid, trControl = ctrl1)
+
+ggplot(mars.fit)
+
+print(mars.fit$bestTune)
+print(coef(mars.fit$finalModel))
+print(mars.fit)
+```
+In order to minimize the MSE, 1 degree of interaction and 6 retained terms were used (as depicted on the plot). The most important predictors are depicted below:
+
+```{r marspredictors, echo=FALSE}
+p1 <- vip(mars.fit, num_features = 10, bar = FALSE, value = "gcv") + ggtitle("GCV")
+p2 <- vip(mars.fit, num_features = 10, bar = FALSE, value = "rss") + ggtitle("RSS")
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+``` 
+
+##### KNN
+###### Assumptions:
+```{r}
+
+trainX <- train[,names(train) != "house_price"]
+preProcValues <- preProcess(x = trainX,method = c("center", "scale"))
+preProcValues
+set.seed(1)
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+knn_fit <- train(house_price ~., data = train, method = "knn",
+            trControl = trctrl,
+            preProcess = c("center", "scale"),
+            tuneLength = 10)
+knn_fit
+# Plot model error RMSE vs different values of k
+ggplot(knn_fit)
+# Best tuning parameter k that minimizes the RMSE
+knn_fit$bestTune
+# Make predictions on the test data
+knn_predict <- knn_fit %>% predict(test)
+# Compute the prediction error RMSE
+RMSE(knn_predict, test$house_price)
+```
+
+##### Ridge Regression
+###### Assumptions:
+```{r, echo=FALSE}
+ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+set.seed(123)
+ridge.fit <- train(x, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = 0, 
+                                            lambda = exp(seq(-1, 10, length = 100))),
+                   # preProc = c("center", "scale"),
+                     trControl = ctrl1)
+plot(ridge.fit, xTrans = function(x) log(x))
+ridge.fit$bestTune
+coef(ridge.fit$finalModel,ridge.fit$bestTune$lambda)
+```
+```{r ridgereg, echo=FALSE}
+p111 <- vip(ridge.fit, num_features = 10, bar = FALSE, value = "gcv") + ggtitle("GCV")
+p211 <- vip(ridge.fit, num_features = 10, bar = FALSE, value = "rss") + ggtitle("RSS")
+gridExtra::grid.arrange(p111, p211, ncol = 2)
+``` 
+
+##### Lasso
+###### Assumptions:
+```{r}
+set.seed(123)
+lasso.fit <- train(x, y, method = "glmnet", tuneGrid = expand.grid(alpha = 1, lambda = exp(seq(-1, 5, length=100))), trControl = ctrl1)
+
+plot(lasso.fit, xTrans = function(x) log(x))
+
+lasso.fit$bestTune
+
+coef(lasso.fit$finalModel,lasso.fit$bestTune$lambda)
+```
+
+##### Linear
+###### Assumptions: Linear relationship, Residuals normality, No or little multicollinearity, No auto-correlation, Homoscedasticity
+```{r, echo=FALSE}
+set.seed(2)
+lm.fit <- train(x, y,
+                method = "lm",
+                trControl = ctrl1)
+summary(lm.fit)
+```
+
+```{r lmpred, echo=FALSE}
+p11 <- vip(lm.fit, num_features = 10, bar = FALSE, value = "gcv") + ggtitle("GCV")
+p21 <- vip(lm.fit, num_features = 10, bar = FALSE, value = "rss") + ggtitle("RSS")
+gridExtra::grid.arrange(p11, p21, ncol = 2)
+``` 
+
+```{r calculations, include=FALSE}
+sqrt(mean(residuals(lm.fit)^2))
+summary(gam.m4)
+summary(mars.fit)
+sqrt(mean(residuals(ridge.fit)^2))
+sqrt(mean(residuals(lasso.fit)^2))
+```
+
+## Conclusion
+Based on our results...
+
