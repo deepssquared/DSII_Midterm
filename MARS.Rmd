@@ -1,0 +1,58 @@
+---
+title: "MARS"
+output: html_notebook
+author: Deepika Dilip
+---
+
+```{r}
+knitr::opts_chunk$set(echo=TRUE)
+knitr::opts_chunk$set(warning=F)
+knitr::opts_chunk$set(message=F)
+```
+
+```{r}
+library(tidyverse) 
+library(ggplot2)
+library(janitor)
+library(earth)
+library(pdp)
+library(readxl)
+library(caret)
+```
+
+#Importing Data
+```{r}
+taipei_data <- read_excel("Real_estate_valuation_data_set.xlsx") %>%
+  janitor::clean_names()
+```
+
+#Selecting x and y
+```{r}
+taipei_data <- na.omit(taipei_data) 
+taipei_data$no <- NULL
+
+x <- model.matrix(y_house_price_of_unit_area~. ,taipei_data)[,-1]
+y <- taipei_data$y_house_price_of_unit_area
+```
+
+#Optimizing Tuning Parameters (caret package)
+```{r}
+set.seed(2)
+mars_grid <- expand.grid(degree = 1:2, nprune = 2:8)
+ctrl1 <- trainControl(method = "cv", number = 10)
+
+mars.fit <- train(x, y, method = "earth", tuneGrid = mars_grid, trControl = ctrl1)
+
+ggplot(mars.fit)
+
+print(mars.fit$bestTune)
+print(coef(mars.fit$finalModel))
+print(mars.fit)
+```
+
+###Degree = 1, Prune no. = 7
+RMSE: 7.538869
+R-Squared: 0.7025292
+MAE:5.165409
+
+
