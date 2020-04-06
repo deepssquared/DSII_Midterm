@@ -63,7 +63,7 @@ taipei_data  =
          )
 ```
 
-####Descriptive Statistics
+#### Descriptive Statistics
 ```{r, echo=FALSE}
 stat.desc(taipei_data) %>% round() %>%  kable(full_width = F, font_size=8)
 ```
