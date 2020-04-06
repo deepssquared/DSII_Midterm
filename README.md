@@ -1,12 +1,4 @@
----
-title: "Midterm Report"
-author: "Chirag Shah, Nathalie Fadel, Deepika Dilip"
-output:
-  pdf_document: default
-  word_document: default
-  html_document:
-    df_print: paged
----
+# Midterm Report
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=TRUE)
@@ -14,7 +6,7 @@ knitr::opts_chunk$set(warning=F)
 knitr::opts_chunk$set(message=F)
 ```
 
-##Introduction
+## Introduction
 
 While median wages are remaining stagnant, housing prices in Taipei, Taiwan are increasing exponentially. Using a historical data set of real estate valuation from the Sindian District and New Taipei City in Taiwan, we decided to explore which predictors had the most impact on housing prices in Taipei. 
 
