@@ -87,7 +87,7 @@ corrplot(cor(x))
 ```
 
 
-###Scatterplot
+### Scatterplot
 ```{r, echo=FALSE}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5)
